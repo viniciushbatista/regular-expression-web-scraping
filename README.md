@@ -23,7 +23,9 @@
 
 Este projeto une **teoria de linguagens formais** com uma aplicação prática real: um **web scraper** da Wikipédia em português.
 
-O grande diferencial é a validação do link informado pelo usuário: em vez de usar diretamente a biblioteca `re` do Python, construímos **manualmente** um **Autômato Finito Determinístico (AFD)** que reconhece exatamente a mesma linguagem que a expressão regular `^https://pt\.wikipedia\.org/wiki/[A-Za-z0-9_()\%\-]+$`.
+O grande diferencial é a validação do link informado pelo usuário: em vez de usar diretamente a biblioteca `re` do Python, construímos **manualmente** um **Autômato Finito Determinístico (AFD)** que reconhece exatamente a mesma linguagem que a expressão regular abaixo.
+
+$$\texttt{\^{}https://pt\backslash.wikipedia\backslash.org/wiki/[A\text{-}Za\text{-}z0\text{-}9\\_()\\%\\-]+\$}$$
 
 Isso conecta os conceitos vistos em sala (ER, AFD, simulador de autômato, linguagens regulares) a um caso de uso real.
 
@@ -31,32 +33,17 @@ Isso conecta os conceitos vistos em sala (ER, AFD, simulador de autômato, lingu
 
 ## ⚙️ Como Funciona
 
-```
-Usuário informa um link
-        │
-        ▼
-┌─────────────────────────┐
-│   Validação pelo AFD    │  ◄── construído à mão, símbolo a símbolo
-│   (simulado em Python)  │
-└────────────┬────────────┘
-             │
-      ┌──────┴──────┐
-      │             │
-   ACEITA        REJEITA
-      │             │
-      ▼             ▼
-Baixa o HTML   Mostra trace
-da Wikipedia   do AFD e encerra
-      │
-      ▼
-┌─────────────────────────────────────┐
-│              MENU                   │
-│  1 - Tópicos do artigo              │
-│  2 - Imagens                        │
-│  3 - Links para outros artigos      │
-│  4 - Definição + simulação do AFD   │
-│  0 - Sair                           │
-└─────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A([▶ Usuário informa um link]) --> B{Validação\npelo AFD}
+    B -- ✅ ACEITA --> C[Baixa o HTML\nda Wikipédia]
+    B -- ❌ REJEITA --> D([Mostra trace do AFD\ne encerra])
+    C --> E{Menu de opções}
+    E --> F[1 · Tópicos do artigo]
+    E --> G[2 · Imagens]
+    E --> H[3 · Links para outros artigos]
+    E --> I[4 · Definição + simulação do AFD]
+    E --> J([0 · Sair])
 ```
 
 ---
@@ -65,44 +52,43 @@ da Wikipedia   do AFD e encerra
 
 A ER utilizada para validar os links da Wikipédia é:
 
-```
-^https://pt\.wikipedia\.org/wiki/[A-Za-z0-9_()\%\-]+$
-```
+$$\underbrace{\texttt{\^{}https://pt\backslash.wikipedia\backslash.org/wiki/}}_{\text{prefixo fixo obrigatório}}\underbrace{\texttt{[A\text{-}Za\text{-}z0\text{-}9\\_()\\%\\-]}}_{\text{classe de caracteres válidos}}\underbrace{\texttt{+}}_{\geq 1}\underbrace{\texttt{\$}}_{\text{fim}}$$
 
 ### Anatomia da ER
 
-| Parte da ER | Significado |
-|---|---|
-| `^` | Início da cadeia |
-| `https://pt\.wikipedia\.org/wiki/` | Prefixo literal obrigatório (os `.` são escapados) |
-| `[A-Za-z0-9_()\%\-]` | **Classe de caracteres** válidos para o nome do artigo |
-| `+` | Um ou mais caracteres da classe acima |
-| `$` | Fim da cadeia |
+| Fragmento | Tipo | Significado |
+|---|---|---|
+| `^` | Âncora | Início da cadeia |
+| `https://pt` | Literal | Protocolo e subdomínio |
+| `\.wikipedia\.org/wiki/` | Literal (`.` escapado) | Domínio e caminho fixo |
+| `[A-Za-z0-9_()\%\-]` | Classe de caracteres | Caracteres válidos do artigo |
+| `+` | Quantificador | Um ou mais ocorrências |
+| `$` | Âncora | Fim da cadeia |
 
-### Classe de Caracteres do Artigo
+### Classe de Caracteres
 
 ```
 [A-Za-z0-9_()\%\-]
- │      │  │││ │
- │      │  │││ └── hífen  (ex: Jean-Paul_Sartre)
- │      │  ││└──── percentual (ex: encoding %C3)
- │      │  │└───── parênteses (ex: Mercúrio_(planeta))
- │      │  └────── underscore (ex: São_Paulo)
- │      └───────── dígitos 0–9
- └──────────────── letras maiúsculas e minúsculas
+ ├─ A-Z   letras maiúsculas
+ ├─ a-z   letras minúsculas
+ ├─ 0-9   dígitos
+ ├─ _     underscore  → ex: São_Paulo
+ ├─ ( )   parênteses  → ex: Mercurio_(planeta)
+ ├─ %     percent     → ex: S%C3%A3o_Paulo (URL encoding)
+ └─ -     hífen       → ex: Jean-Paul_Sartre
 ```
 
-### Exemplos
+### Tabela de Exemplos
 
 | Link | Válido? | Motivo |
 |---|---|---|
-| `https://pt.wikipedia.org/wiki/Python` | ✅ Sim | Formato correto |
-| `https://pt.wikipedia.org/wiki/S%C3%A3o_Paulo` | ✅ Sim | % e _ permitidos |
-| `https://pt.wikipedia.org/wiki/Mercurio_(planeta)` | ✅ Sim | Parênteses permitidos |
-| `https://pt.wikipedia.org/wiki/` | ❌ Não | Nome do artigo vazio (`+` exige ≥ 1) |
-| `https://en.wikipedia.org/wiki/Python` | ❌ Não | Domínio `en` em vez de `pt` |
-| `http://pt.wikipedia.org/wiki/Python` | ❌ Não | `http` sem `s` |
-| `https://pt.wikipedia.org/wiki/Python#Secao` | ❌ Não | `#` não está na classe |
+| `https://pt.wikipedia.org/wiki/Python` | ✅ | Formato correto |
+| `https://pt.wikipedia.org/wiki/S%C3%A3o_Paulo` | ✅ | `%` e `_` permitidos |
+| `https://pt.wikipedia.org/wiki/Mercurio_(planeta)` | ✅ | Parênteses permitidos |
+| `https://pt.wikipedia.org/wiki/` | ❌ | Artigo vazio — `+` exige ≥ 1 char |
+| `https://en.wikipedia.org/wiki/Python` | ❌ | `en` ≠ `pt` |
+| `http://pt.wikipedia.org/wiki/Python` | ❌ | `http` sem `s` |
+| `https://pt.wikipedia.org/wiki/Foo#Bar` | ❌ | `#` não está na classe |
 
 ---
 
@@ -110,72 +96,125 @@ A ER utilizada para validar os links da Wikipédia é:
 
 ### Definição Formal
 
-```
-M = (Q, Σ, δ, q₀, F)
+$$M = (Q,\ \Sigma,\ \delta,\ q_0,\ F)$$
 
-  Q  = { q0, q1, ..., q30, q31, ERRO }
-  Σ  = Caracteres ASCII imprimíveis
-  q₀ = q0   (estado inicial)
-  F  = { q31 }  (único estado de aceitação)
-  δ  = função de transição (descrita abaixo)
-```
+$$Q = \{q_0,\ q_1,\ \ldots,\ q_{30},\ q_{31},\ q_{\text{erro}}\}$$
+
+$$\Sigma = \text{caracteres ASCII imprimíveis}$$
+
+$$q_0 = \text{estado inicial}$$
+
+$$F = \{q_{31}\} \quad \text{— único estado de aceitação}$$
 
 ### Lógica dos Estados
 
-O AFD tem **33 estados** no total:
-
 | Estado | Significado |
 |---|---|
-| `q0` | Estado inicial |
-| `q1` a `q29` | Lendo o prefixo `https://pt.wikipedia.org/wiki/` caractere a caractere |
-| `q30` | Prefixo completo lido — aguarda **1º caractere** do artigo |
-| `q31` | **Estado de aceitação** — lendo os demais caracteres do artigo |
-| `ERRO` | Estado poço (trap) — cadeia inválida, sem retorno |
+| $q_0$ | Estado inicial |
+| $q_1 \ldots q_{29}$ | Lendo o prefixo `https://pt.wikipedia.org/wiki/` caractere a caractere |
+| $q_{30}$ | Prefixo completo — aguarda **1º caractere** do artigo |
+| $q_{31}$ | ✅ **Estado de aceitação** — lendo os demais caracteres do artigo |
+| $q_\text{erro}$ | 🚫 **Estado poço (trap)** — cadeia inválida, sem retorno possível |
 
-### Diagrama do AFD
+---
 
+### Diagrama — Visão Geral
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    state "q1 ··· q29" as PREF
+
+    [*] --> q0
+    q0 --> PREF    : h,t,t,p,s,colon,slash,slash,p,t,...
+    PREF --> q30   : / (30° símbolo — prefixo completo)
+    q30 --> q31    : char válido
+    q31 --> q31    : char válido
+    q31 --> [*]
+
+    q0   --> ERRO  : outro símbolo
+    PREF --> ERRO  : símbolo errado
+    q30  --> ERRO  : char inválido
+    q31  --> ERRO  : char inválido
+    ERRO --> ERRO  : qualquer símbolo
 ```
-              'h'   't'   't'   'p'   's'  ':'  '/'  '/'  'p'  't'  '.'  ...  '/'
-  ──► [q0] ──► [q1]──[q2]──[q3]──[q4]──[q5]──[q6]──[q7]──[q8]──[q9]──[q10]──...──[q30]
-        │                                                                               │
-        │ (qualquer                                                     [A-Za-z0-9_()%-]│
-        │  símbolo                                                                      │
-        │  inválido)                                                                    ▼
-        └────────────────────────────────────────────────────────► ┌─────────────────────┐
-                                                                    │       [q31]         │◄─┐
-                   [ERRO] ◄──── (qualquer símbolo inválido) ────── │    (ACEITA ✅)      │  │
-                  (trap)                                            └─────────────────────┘  │
-                                                                              │               │
-                                                                    [A-Za-z0-9_()%-]         │
-                                                                              └───────────────┘
-                                                                            (auto-laço)
+
+> `char válido` = qualquer caractere de `[A-Za-z0-9_()\%\-]`
+
+---
+
+### Diagrama — Detalhe do Prefixo (q0 → q10)
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*] --> q0
+    q0  --> q1  : h
+    q1  --> q2  : t
+    q2  --> q3  : t
+    q3  --> q4  : p
+    q4  --> q5  : s
+    q5  --> q6  : ":"
+    q6  --> q7  : /
+    q7  --> q8  : /
+    q8  --> q9  : p
+    q9  --> q10 : t
+    q10 --> q11 : .
+    q11 --> q12 : w
+    q12 --> q13 : i
+    q13 --> q14 : k
+    q14 --> q15 : i
+    q15 --> q16 : p
+    q16 --> q17 : e
+    q17 --> q18 : d
+    q18 --> q19 : i
+    q19 --> q20 : a
 ```
+
+---
+
+### Diagrama — Estados de Aceitação e Erro
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    state "q30\n(prefixo completo)" as q30
+    state "q31  ✅  ACEITA" as q31
+    state "ERRO  🚫  trap" as ERRO
+
+    q30 --> q31  : char válido
+    q30 --> ERRO : char inválido
+    q31 --> q31  : char válido
+    q31 --> [*]
+    q31 --> ERRO : char inválido
+    ERRO --> ERRO : qualquer símbolo
+```
+
+---
 
 ### Função de Transição δ
 
-```
-δ(qᵢ,  PREFIXO[i])        = q(i+1)    para i = 0..29   (lê a cadeia fixa char a char)
-δ(qᵢ,  outro símbolo)     = ERRO      para i = 0..29
+$$\delta(q_i,\ \text{PREFIXO}[i]) = q_{i+1}, \quad 0 \leq i \leq 29$$
 
-δ(q30, [A-Za-z0-9_()\%-]) = q31       ← 1º char do artigo (obrigatório)
-δ(q30, outro símbolo)      = ERRO
+$$\delta(q_i,\ c) = q_\text{erro}, \quad 0 \leq i \leq 29,\ c \neq \text{PREFIXO}[i]$$
 
-δ(q31, [A-Za-z0-9_()\%-]) = q31       ← auto-laço nos demais caracteres
-δ(q31, outro símbolo)      = ERRO
+$$\delta(q_{30},\ c) = \begin{cases} q_{31} & \text{se } c \in [A\text{-}Za\text{-}z0\text{-}9\\_()\\%\\-] \\ q_\text{erro} & \text{caso contrário} \end{cases}$$
 
-δ(ERRO, qualquer)          = ERRO      ← poço (trap state): sem retorno
-```
+$$\delta(q_{31},\ c) = \begin{cases} q_{31} & \text{se } c \in [A\text{-}Za\text{-}z0\text{-}9\\_()\\%\\-] \\ q_\text{erro} & \text{caso contrário} \end{cases}$$
 
-> **Estado poço (trap state):** uma vez atingido o estado `ERRO`, nenhum símbolo consegue sair dele. Isso garante que qualquer prefixo inválido descarta a cadeia inteiramente.
+$$\delta(q_\text{erro},\ c) = q_\text{erro}, \quad \forall c \in \Sigma \quad \text{(poço)}$$
+
+---
 
 ### Simulação Passo a Passo
 
 #### ✅ Link válido — `https://pt.wikipedia.org/wiki/Python`
 
 ```
-SIMULAÇÃO DO AFD (estado a estado):
-
-  inicio -> q0
+inicio -> q0
   le 'h' : q0  -> q1
   le 't' : q1  -> q2
   le 't' : q2  -> q3
@@ -186,42 +225,22 @@ SIMULAÇÃO DO AFD (estado a estado):
   le '/' : q7  -> q8
   le 'p' : q8  -> q9
   le 't' : q9  -> q10
-  le '.' : q10 -> q11
-  le 'w' : q11 -> q12
-  le 'i' : q12 -> q13
-  le 'k' : q13 -> q14
-  le 'i' : q14 -> q15
-  le 'p' : q15 -> q16
-  le 'e' : q16 -> q17
-  le 'd' : q17 -> q18
-  le 'i' : q18 -> q19
-  le 'a' : q19 -> q20
-  le '.' : q20 -> q21
-  le 'o' : q21 -> q22
-  le 'r' : q22 -> q23
-  le 'g' : q23 -> q24
-  le '/' : q24 -> q25
-  le 'w' : q25 -> q26
-  le 'i' : q26 -> q27
-  le 'k' : q27 -> q28
-  le 'i' : q28 -> q29
-  le '/' : q29 -> q30   ◄── prefixo completo!
-  le 'P' : q30 -> q31   ◄── 1º char do artigo → entra em ACEITA
+  ...
+  le '/' : q29 -> q30   ← prefixo completo!
+  le 'P' : q30 -> q31   ← 1º char do artigo → entra em ACEITA
   le 'y' : q31 -> q31
   le 't' : q31 -> q31
   le 'h' : q31 -> q31
   le 'o' : q31 -> q31
   le 'n' : q31 -> q31
 
-  Terminou em q31 ACEITA -> ✅ ACEITA
+  Terminou em q31 ✅ ACEITA
 ```
 
 #### ❌ Link inválido — `https://en.wikipedia.org/wiki/Python`
 
 ```
-SIMULAÇÃO DO AFD (estado a estado):
-
-  inicio -> q0
+inicio -> q0
   le 'h' : q0  -> q1
   le 't' : q1  -> q2
   le 't' : q2  -> q3
@@ -230,7 +249,7 @@ SIMULAÇÃO DO AFD (estado a estado):
   le ':' : q5  -> q6
   le '/' : q6  -> q7
   le '/' : q7  -> q8
-  le 'e' : q8  -> ERRO   ◄── esperava 'p' (de "pt."), recebeu 'e'
+  le 'e' : q8  -> ERRO  ← esperava 'p' (de "pt."), recebeu 'e'
 
   Caiu no estado de ERRO: a cadeia é ❌ REJEITADA.
 ```
@@ -239,13 +258,18 @@ SIMULAÇÃO DO AFD (estado a estado):
 
 ## 🔄 Equivalência ER ↔ AFD
 
-Pelo **Teorema de Kleene**, toda linguagem regular pode ser descrita tanto por uma **Expressão Regular** quanto por um **Autômato Finito**. Este projeto demonstra isso na prática:
+Pelo **Teorema de Kleene**, toda linguagem regular pode ser descrita tanto por uma **Expressão Regular** quanto por um **Autômato Finito**:
 
-| Expressão Regular | AFD equivalente |
-|---|---|
-| `^https://pt\.wikipedia\.org/wiki/` | `q0 → q1 → ... → q30` (prefixo lido char a char) |
-| `[A-Za-z0-9_()\%\-]+` | `q30 → q31` (1º char) + auto-laço `q31 → q31` |
-| Rejeição de tudo mais | Qualquer transição não definida → `ERRO` |
+```mermaid
+flowchart LR
+    ER["🔤 Expressão Regular\n^https://pt\\.wikipedia\\.org/wiki/\n[A-Za-z0-9_()%-]+$"]
+    AFD["🤖 AFD\nM = (Q, Σ, δ, q₀, F)\n33 estados"]
+    LANG(["🌐 Mesma Linguagem\nLinks válidos da Wikipédia PT"])
+
+    ER  -->|"Teorema de Kleene"| LANG
+    AFD -->|"Teorema de Kleene"| LANG
+    ER  <-->|"equivalentes"| AFD
+```
 
 No código, os dois métodos são executados e comparados — e **sempre concordam**:
 
@@ -259,30 +283,25 @@ valido_regex = validar_link_regex(link)  # re.match() do Python
 
 ## 🕵️ Funcionalidades do Scraper
 
-Após a validação bem-sucedida do link, o programa oferece:
+### ERs usadas na extração
 
-### 1. Tópicos do Artigo
-Extrai os títulos do índice da página usando as ERs:
-```python
-r'<div class="vector-toc-text".*?>[\s\S]*?</div>'  # bloco do índice
-r'<span>(.*?)</span>'                               # título de cada tópico
-```
+| Funcionalidade | Expressão Regular |
+|---|---|
+| Bloco do índice | `<div class="vector-toc-text".*?>[\s\S]*?</div>` |
+| Título do tópico | `<span>(.*?)</span>` |
+| Figuras | `<figure[\s\S]*?</figure>` |
+| Nome da imagem | `src="[^"]*/([^/]+\.(?:jpg\|png\|svg\|jpeg))"` |
+| Links internos | `href="(/wiki/[^":#]+)"` |
 
-### 2. Imagens
-Coleta os nomes de arquivo de todas as imagens do artigo (figuras e infoboxes):
-```python
-r'<figure[\s\S]*?</figure>'                                   # elementos figure
-r'src="[^"]*/([^/]+\.(?:jpg|png|svg|jpeg))"'                  # nome do arquivo
-```
+### Menu de opções
 
-### 3. Links para Outros Artigos
-Encontra todos os links internos da Wikipédia presentes no artigo:
-```python
-r'href="(/wiki/[^":#]+)"'   # links internos sem âncoras ou namespaces
-```
-
-### 4. Definição + Simulação do AFD
-Exibe a definição formal `M = (Q, Σ, δ, q₀, F)` e simula a execução do AFD no link informado, estado a estado.
+| Opção | O que faz |
+|---|---|
+| `1` | Lista todos os tópicos do índice do artigo |
+| `2` | Lista todas as imagens (figuras + infobox) |
+| `3` | Lista links para outros artigos da Wikipédia |
+| `4` | Exibe definição formal do AFD + simulação estado a estado |
+| `0` | Encerra o programa |
 
 ---
 
@@ -290,7 +309,7 @@ Exibe a definição formal `M = (Q, Σ, δ, q₀, F)` e simula a execução do A
 
 ### Pré-requisitos
 
-- Python 3.x (sem dependências externas — apenas bibliotecas padrão)
+- Python **3.6+** — sem dependências externas (apenas bibliotecas padrão)
 
 ### Executando
 
@@ -298,7 +317,7 @@ Exibe a definição formal `M = (Q, Σ, δ, q₀, F)` e simula a execução do A
 python web_scraping_er_afd.py
 ```
 
-### Fluxo de uso
+### Exemplo de sessão
 
 ```
 Digite o link do artigo da Wikipedia: https://pt.wikipedia.org/wiki/Linguagem_formal
@@ -318,47 +337,13 @@ Escolha uma opcao:
 
 ---
 
-## 📌 Exemplos de Execução
-
-### Tópicos — Artigo sobre Linguagem Formal
-
-```
-TOPICOS DO ARTIGO:
-
-- Definição
-- Palavras e linguagens
-- Operações sobre linguagens
-- Linguagens formais e máquinas abstratas
-- Complexidade de linguagens formais
-- Aplicações
-- Ver também
-- Referências
-
-Total de topicos: 8
-```
-
-### Imagens — Artigo sobre Python
-
-```
-IMAGENS DO ARTIGO:
-
-- Python-logo-notext.svg
-- Guido_van_Rossum_OSCON_2006.jpg
-- ...
-
-Total de imagens: 5
-```
-
----
-
 ## 📦 Requisitos
 
-| Item | Versão |
-|---|---|
-| Python | ≥ 3.6 |
-| `urllib` | padrão (built-in) |
-| `re` | padrão (built-in) |
-| `string` | padrão (built-in) |
+| Biblioteca | Versão | Uso |
+|---|---|---|
+| `urllib` | built-in | Download do HTML |
+| `re` | built-in | Expressões regulares |
+| `string` | built-in | Conjunto de caracteres ASCII |
 
 Nenhuma instalação extra necessária. ✅
 
@@ -369,10 +354,10 @@ Nenhuma instalação extra necessária. ✅
 | Conceito | Onde aparece no código |
 |---|---|
 | Expressão Regular | `validar_link_regex()` — padrão `r"^https://..."` |
-| AFD (definição formal) | `descrever_afd()` — imprime Q, Σ, δ, q₀, F |
-| Função de transição δ | `delta(estado, c)` — implementada como função Python |
-| Estado poço (trap) | Constante `TRAP = -1`, retorno imediato em `validar_link_afd()` |
-| Simulador de AFD | `mostrar_trace(link)` — percorre a cadeia e exibe cada transição |
+| AFD — definição formal $M=(Q,\Sigma,\delta,q_0,F)$ | `descrever_afd()` |
+| Função de transição $\delta$ | `delta(estado, c)` — implementada como função Python |
+| Estado poço (trap state) | Constante `TRAP = -1`, retorno imediato em `validar_link_afd()` |
+| Simulador de AFD | `mostrar_trace(link)` — percorre a cadeia símbolo a símbolo |
 | Teorema de Kleene | Comparação entre AFD e `re.match()` — sempre concordam |
 
 ---
