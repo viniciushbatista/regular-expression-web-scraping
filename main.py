@@ -2,31 +2,12 @@ import urllib.request
 import re
 import string
 
-# =========================================================
-# VALIDAÇÃO DO LINK POR AFD (Autômato Finito Determinístico)
-# ---------------------------------------------------------
-# Em vez de validar só com re.match, construímos AQUI, à mão, o AFD
-# que reconhece EXATAMENTE a mesma linguagem da expressão regular:
-#
-#     ^https://pt\.wikipedia\.org/wiki/[A-Za-z0-9_()%\-]+$
-#
-# A linguagem é: a cadeia fixa "https://pt.wikipedia.org/wiki/"
-# seguida de UM OU MAIS caracteres válidos de artigo.
-#
-# O AFD é simulado como o professor descreve um simulador de AFD:
-#   - guardamos o ESTADO ATUAL
-#   - lemos a cadeia símbolo a símbolo
-#   - a FUNÇÃO DE TRANSIÇÃO (delta) decide o próximo estado
-# Isso liga o conceito (autômato / linguagem regular) à aplicação.
-# =========================================================
+PREFIXO = "https://pt.wikipedia.org/wiki/"
+N = len(PREFIXO)
+PREFIXO_COMPLETO = N
+ACEITA = N + 1
+TRAP = -1
 
-PREFIXO = "https://pt.wikipedia.org/wiki/"   # cadeia fixa (30 símbolos)
-N = len(PREFIXO)                             # 30
-PREFIXO_COMPLETO = N                         # estado 30: leu todo o prefixo
-ACEITA = N + 1                               # estado 31: estado de aceitação
-TRAP = -1                                    # estado de erro (poço)
-
-# classe de caractere [A-Za-z0-9_()%\-]
 CHARS_ARTIGO = set(string.ascii_letters + string.digits + "_()%-")
 
 
@@ -35,29 +16,27 @@ def eh_char_artigo(c):
 
 
 def delta(estado, c):
-    # função de transição do AFD
-    if estado == TRAP:                      # erro é poço: nunca sai dele
+    if estado == TRAP:
         return TRAP
-    if estado < N:                          # consumindo o prefixo, char a char
+    if estado < N:
         return estado + 1 if c == PREFIXO[estado] else TRAP
-    if estado == PREFIXO_COMPLETO:          # precisa de >= 1 caractere de artigo
+    if estado == PREFIXO_COMPLETO:
         return ACEITA if eh_char_artigo(c) else TRAP
-    if estado == ACEITA:                    # auto-laço nos demais caracteres
+    if estado == ACEITA:
         return ACEITA if eh_char_artigo(c) else TRAP
     return TRAP
 
 
 def validar_link_afd(link):
-    estado = 0                              # estado inicial q0
+    estado = 0
     for c in link:
         estado = delta(estado, c)
         if estado == TRAP:
             return False
-    return estado == ACEITA                 # aceita só se terminar no estado final
+    return estado == ACEITA
 
 
 def validar_link_regex(link):
-    # validação equivalente com a ER do Python (usada só para conferência)
     padrao = r"^https://pt\.wikipedia\.org/wiki/[A-Za-z0-9_()%\-]+$"
     return re.match(padrao, link) is not None
 
@@ -73,8 +52,7 @@ def _rotulo(estado):
 
 
 def mostrar_trace(link):
-    # mostra o AFD "andando" pela cadeia (ótimo para a apresentação)
-    print("\nSIMULAÇÃO DO AFD (estado a estado):\n")
+    print("\nSIMULACAO DO AFD (estado a estado):\n")
     estado = 0
     print(f"  inicio -> {_rotulo(estado)}")
     for c in link:
@@ -89,7 +67,6 @@ def mostrar_trace(link):
 
 
 def descrever_afd():
-    # definição formal M = (Q, Sigma, delta, q0, F)
     print("\nDEFINICAO FORMAL DO AFD  M = (Q, Sigma, delta, q0, F)\n")
     print("  Q  (estados):   q0, q1, ..., q31 e ERRO(trap)")
     print("  Sigma (alfabeto): caracteres ASCII imprimiveis")
@@ -103,9 +80,6 @@ def descrever_afd():
     print("   - qualquer outra transicao --> ERRO(trap)")
 
 
-# =========================================================
-# BAIXAR HTML
-# =========================================================
 def baixar_html(link):
     headers = {"User-Agent": "Mozilla/5.0"}
     req = urllib.request.Request(link, headers=headers)
@@ -114,9 +88,6 @@ def baixar_html(link):
     return html
 
 
-# =========================================================
-# EXTRAIR TÓPICOS DO ÍNDICE
-# =========================================================
 def extrair_topicos(html):
     padrao_blocos = r'<div class="vector-toc-text".*?>[\s\S]*?</div>'
     blocos = re.findall(padrao_blocos, html)
@@ -132,9 +103,6 @@ def extrair_topicos(html):
     print("\nTotal de topicos:", len(topicos))
 
 
-# =========================================================
-# EXTRAIR IMAGENS
-# =========================================================
 def extrair_imagens(html):
     imagens = []
 
@@ -158,9 +126,6 @@ def extrair_imagens(html):
     print("\nTotal de imagens:", len(imagens))
 
 
-# =========================================================
-# EXTRAIR LINKS DE OUTROS ARTIGOS
-# =========================================================
 def extrair_links(html):
     padrao = r'href="(/wiki/[^":#]+)"'
     links = re.findall(padrao, html)
@@ -172,14 +137,11 @@ def extrair_links(html):
     print("\nTotal de links encontrados:", len(links))
 
 
-# =========================================================
-# PROGRAMA PRINCIPAL
-# =========================================================
 if __name__ == "__main__":
     link = input("Digite o link do artigo da Wikipedia: ")
 
-    valido_afd = validar_link_afd(link)         # validação pelo AFD (à mão)
-    valido_regex = validar_link_regex(link)     # conferência com o re do Python
+    valido_afd = validar_link_afd(link)
+    valido_regex = validar_link_regex(link)
 
     if valido_afd:
         print("\nLink valido! (reconhecido pelo AFD construido a mao)")
